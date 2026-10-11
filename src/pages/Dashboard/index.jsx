@@ -48,7 +48,19 @@ const Dashboard = () => {
         onCollapse={(value) => setCollapsed(value)}
       >
         <div className="dashboard-brand">
-          <div className="dashboard-brand-mark">SP</div>
+          <img
+            src="/suthra-logo.webp"
+            alt="Suthra Punjab"
+            className="dashboard-brand-logo"
+            style={{
+              height: "42px",
+              maxWidth: "58px",
+              objectFit: "contain",
+              borderRadius: "8px",
+              background: "#ffffff",
+              padding: "2px 4px",
+            }}
+          />
           <div className="dashboard-brand-copy">
             <Typography.Text className="dashboard-brand-name">SPA</Typography.Text>
             <Typography.Text className="dashboard-brand-caption">FIELD OPERATIONS</Typography.Text>

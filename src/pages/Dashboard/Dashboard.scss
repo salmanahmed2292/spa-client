@@ -84,6 +84,19 @@
   color: #c2ceca;
   font-size: 13px;
   font-weight: 500;
+  animation: dashboard-nav-enter 600ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.dashboard-sidebar .dashboard-nav .ant-menu-item:nth-child(2) {
+  animation-delay: 250ms;
+}
+
+.dashboard-sidebar .dashboard-nav .ant-menu-item:nth-child(3) {
+  animation-delay: 500ms;
+}
+
+.dashboard-sidebar .dashboard-nav .ant-menu-item:nth-child(n + 4) {
+  animation-delay: 750ms;
 }
 
 .dashboard-sidebar .dashboard-nav .ant-menu-item .ant-menu-item-icon {
@@ -232,6 +245,128 @@
 .dashboard-overview {
   max-width: 1440px;
   margin: 0 auto;
+}
+
+@keyframes dashboard-card-enter {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes dashboard-nav-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes dashboard-row-enter {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.overview-metrics > .ant-col,
+.progress-summary > .ant-col,
+.progress-page > .ant-row:not(.progress-top-header):not(.progress-summary) > .ant-col {
+  animation: dashboard-card-enter 620ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.overview-metrics > .ant-col:nth-child(2),
+.progress-summary > .ant-col:nth-child(2),
+.progress-page > .ant-row:not(.progress-top-header):not(.progress-summary) > .ant-col:nth-child(2) {
+  animation-delay: 160ms;
+}
+
+.overview-metrics > .ant-col:nth-child(3),
+.progress-summary > .ant-col:nth-child(3),
+.progress-page > .ant-row:not(.progress-top-header):not(.progress-summary) > .ant-col:nth-child(3) {
+  animation-delay: 320ms;
+}
+
+.overview-metrics > .ant-col:nth-child(4),
+.progress-summary > .ant-col:nth-child(4),
+.progress-page > .ant-row:not(.progress-top-header):not(.progress-summary) > .ant-col:nth-child(4) {
+  animation-delay: 480ms;
+}
+
+.progress-page > .ant-row:not(.progress-top-header):not(.progress-summary) > .ant-col:nth-child(5) {
+  animation-delay: 640ms;
+}
+
+.progress-page > .ant-row:not(.progress-top-header):not(.progress-summary) > .ant-col:nth-child(6) {
+  animation-delay: 800ms;
+}
+
+.progress-page > .ant-row:not(.progress-top-header):not(.progress-summary) > .ant-col:nth-child(n + 7) {
+  animation-delay: 960ms;
+}
+
+.table-responsive .ant-table-tbody > tr {
+  animation: dashboard-row-enter 480ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.table-responsive .ant-table-tbody > tr:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.table-responsive .ant-table-tbody > tr:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+.table-responsive .ant-table-tbody > tr:nth-child(4) {
+  animation-delay: 360ms;
+}
+
+.table-responsive .ant-table-tbody > tr:nth-child(5) {
+  animation-delay: 480ms;
+}
+
+.table-responsive .ant-table-tbody > tr:nth-child(6) {
+  animation-delay: 600ms;
+}
+
+.table-responsive .ant-table-tbody > tr:nth-child(7) {
+  animation-delay: 720ms;
+}
+
+.table-responsive .ant-table-tbody > tr:nth-child(8) {
+  animation-delay: 840ms;
+}
+
+.table-responsive .ant-table-tbody > tr:nth-child(9) {
+  animation-delay: 960ms;
+}
+
+.table-responsive .ant-table-tbody > tr:nth-child(n + 10) {
+  animation-delay: 1080ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-metrics > .ant-col,
+  .progress-summary > .ant-col,
+  .progress-page > .ant-row:not(.progress-top-header):not(.progress-summary) > .ant-col,
+  .dashboard-sidebar .dashboard-nav .ant-menu-item,
+  .table-responsive .ant-table-tbody > tr {
+    animation: none;
+  }
 }
 
 .overview-heading {

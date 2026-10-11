@@ -3,7 +3,7 @@ const REPORT_CACHE_TTL = 2 * 60 * 1000;
 const reportCache = new Map();
 const pendingReports = new Map();
 
-const isDateReportList = (method, path) => method === "GET" && /^\/reports\?date=\d{4}-\d{2}-\d{2}$/.test(path);
+const isReportList = (method, path) => method === "GET" && path.startsWith("/reports");
 
 const invalidateReportCache = () => {
   reportCache.clear();
@@ -12,7 +12,7 @@ const invalidateReportCache = () => {
 const apiRequest = async (path, options = {}) => {
   const { body, headers: customHeaders, skipMemoryCache = false, ...requestOptions } = options;
   const method = (requestOptions.method || "GET").toUpperCase();
-  const cacheable = isDateReportList(method, path) && !skipMemoryCache;
+  const cacheable = isReportList(method, path) && !skipMemoryCache;
   const cached = cacheable ? reportCache.get(path) : null;
 
   if (cached && Date.now() - cached.savedAt < REPORT_CACHE_TTL) return cached.data;
@@ -41,7 +41,7 @@ const apiRequest = async (path, options = {}) => {
       throw new Error(payload.message || "The request could not be completed.");
     }
 
-    if (isDateReportList(method, path) && !skipMemoryCache) {
+    if (isReportList(method, path) && !skipMemoryCache) {
       reportCache.set(path, { data: payload.data, savedAt: Date.now() });
     } else if (method !== "GET" && path.startsWith("/reports")) {
       invalidateReportCache();

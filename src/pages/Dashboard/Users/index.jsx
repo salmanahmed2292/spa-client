@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, FileExcelOutlined } from "@ant-design/icons";
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  UploadOutlined,
+  FileExcelOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
 import { Button, Modal, Col, Row, Space, Table, Form, Input, Upload, Tag, message, Popconfirm } from "antd";
 import apiRequest from "../../../lib/api.js";
 import prepareImageUpload from "../../../lib/prepareImageUpload.js";
@@ -27,10 +34,55 @@ const exportHeaders = [
   "Trip 01",
   "Trip 02",
   "Trip 03",
+  "Trip 04",
+  "Trip 05",
   "Total Trips",
   "Trip Achieved",
   "Remarks",
 ];
+
+const addExcelImage = async (workbook, imageUrl) => {
+  const secureUrl = imageUrl.replace(/^http:\/\//i, "https://");
+  const response = await fetch(secureUrl, { mode: "cors" });
+  if (!response.ok) throw new Error("Unable to download report image.");
+
+  let blob = await response.blob();
+  const bitmap = await createImageBitmap(blob, { imageOrientation: "from-image" }).catch(() => null);
+  const width = bitmap?.width || 120;
+  const height = bitmap?.height || 80;
+  let extension = blob.type === "image/jpeg" || blob.type === "image/jpg" ? "jpeg" : blob.type.split("/")[1];
+
+  if (extension !== "jpeg" && extension !== "png") {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error("Unable to process report image.");
+    if (bitmap) {
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+      context.drawImage(bitmap, 0, 0);
+    }
+    blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (imageBlob) => (imageBlob ? resolve(imageBlob) : reject(new Error("Unable to process report image."))),
+        "image/png",
+        1.0,
+      );
+    });
+    extension = "png";
+  }
+  if (bitmap) bitmap.close();
+
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+
+  return { imageId: workbook.addImage({ base64, extension }), width, height };
+};
 
 const makeColumnFilters = (records, getValue) => {
   const values = [...new Set(records.map((record) => String(getValue(record) ?? "")))].sort((left, right) =>
@@ -52,15 +104,13 @@ const Users = () => {
   const [uploadingImages, setUploadingImages] = useState({});
   const [imagePreviews, setImagePreviews] = useState({});
   const previewUrls = useRef(new Set());
-  const [reportsByDate, setReportsByDate] = useState({});
-  const [loadedDates, setLoadedDates] = useState({});
+  const [reports, setReports] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [isExporting, setIsExporting] = useState(false);
 
-  const reportDate = todayDate;
-  const isLoading = !loadedDates[reportDate];
-  const dataSource = reportsByDate[reportDate] || [];
-  const sortedReports = [...dataSource].sort((left, right) => {
+  const sortedReports = [...reports].sort((left, right) => {
     const amoOrder = String(left.amo || "").localeCompare(String(right.amo || ""), undefined, {
       sensitivity: "base",
     });
@@ -99,24 +149,25 @@ const Users = () => {
 
   useEffect(() => {
     let isMounted = true;
-    if (loadedDates[reportDate]) return undefined;
+    setIsLoading(true);
 
-    apiRequest(`/reports?date=${reportDate}`)
-      .then((reports) => {
+    apiRequest("/reports", { skipMemoryCache: refreshVersion > 0 })
+      .then((data) => {
         if (!isMounted) return;
-        setReportsByDate((current) => ({
-          ...current,
-          [reportDate]: reports.map(normalizeReport),
-        }));
-        setLoadedDates((current) => ({ ...current, [reportDate]: true }));
+        setReports((data || []).map(normalizeReport));
+        setIsLoading(false);
       })
       .catch((error) => {
-        if (isMounted) message.error(error.message);
+        if (isMounted) {
+          message.error(error.message);
+          setIsLoading(false);
+        }
       });
+
     return () => {
       isMounted = false;
     };
-  }, [loadedDates, reportDate]);
+  }, [refreshVersion]);
 
   const handleTableCellImageUpload = async (file, recordKey, tripField) => {
     const uploadKey = `${recordKey}:${tripField}`;
@@ -131,16 +182,14 @@ const Users = () => {
       setUploadingImages((current) => ({ ...current, [uploadKey]: true }));
       const formData = new FormData();
       formData.append("image", optimizedFile);
-      const report = await apiRequest(imageEndpoint, {
+      const updatedReport = await apiRequest(imageEndpoint, {
         method: "POST",
         body: formData,
       });
-      setReportsByDate((current) => ({
-        ...current,
-        [reportDate]: (current[reportDate] || []).map((item) =>
-          item.key === recordKey ? { ...report, key: recordKey, sr: item.sr } : item,
-        ),
-      }));
+
+      setReports((current) =>
+        current.map((item) => (item.key === recordKey ? { ...updatedReport, key: recordKey, sr: item.sr } : item)),
+      );
       message.success("Image uploaded successfully!");
     } catch (error) {
       message.error(`Image upload failed: ${error.message}`);
@@ -162,32 +211,22 @@ const Users = () => {
   };
 
   const handleRemoveImage = async (recordKey, tripField) => {
-    const currentReport = dataSource.find((item) => item.key === recordKey);
+    const currentReport = reports.find((item) => item.key === recordKey);
     if (!currentReport) return;
     const previousImage = currentReport[tripField];
-    setReportsByDate((current) => ({
-      ...current,
-      [reportDate]: (current[reportDate] || []).map((item) =>
-        item.key === recordKey ? { ...item, [tripField]: null } : item,
-      ),
-    }));
+
+    setReports((current) => current.map((item) => (item.key === recordKey ? { ...item, [tripField]: null } : item)));
 
     try {
-      const report = await apiRequest(`/reports/${recordKey}/images/${tripField}`, { method: "DELETE" });
-      setReportsByDate((current) => ({
-        ...current,
-        [reportDate]: (current[reportDate] || []).map((item) =>
-          item.key === recordKey ? { ...report, key: recordKey, sr: item.sr } : item,
-        ),
-      }));
+      const updatedReport = await apiRequest(`/reports/${recordKey}/images/${tripField}`, { method: "DELETE" });
+      setReports((current) =>
+        current.map((item) => (item.key === recordKey ? { ...updatedReport, key: recordKey, sr: item.sr } : item)),
+      );
       message.success("Image removed.");
     } catch (error) {
-      setReportsByDate((current) => ({
-        ...current,
-        [reportDate]: (current[reportDate] || []).map((item) =>
-          item.key === recordKey ? { ...item, [tripField]: previousImage } : item,
-        ),
-      }));
+      setReports((current) =>
+        current.map((item) => (item.key === recordKey ? { ...item, [tripField]: previousImage } : item)),
+      );
       message.error(error.message);
     }
   };
@@ -198,6 +237,7 @@ const Users = () => {
     const uploadProgress = uploadingImages[uploadKey];
     const isUploading = uploadProgress !== undefined;
     const shownImageUrl = imagePreviews[uploadKey] || imageUrl;
+
     if (shownImageUrl) {
       return (
         <div
@@ -221,7 +261,6 @@ const Users = () => {
               gap: "2px",
             }}
           >
-            {/* Edit Button Overlay */}
             <Upload
               showUploadList={false}
               beforeUpload={(file) => handleTableCellImageUpload(file, record.key, tripField)}
@@ -239,7 +278,6 @@ const Users = () => {
                 }}
               />
             </Upload>
-            {/* Delete Image Overlay */}
             <Popconfirm
               title="Delete image?"
               description="Are you sure to remove this image?"
@@ -274,17 +312,14 @@ const Users = () => {
     );
   };
 
-  // Open Modal for Adding New Record
   const showAddModal = () => {
     setEditingKey(null);
     form.resetFields();
     setIsModalOpen(true);
   };
 
-  // Open Modal for Editing Existing Record
   const handleEditClick = (record) => {
     setEditingKey(record.key);
-    // Convert date string back to dayjs object for Antd DatePicker
     form.setFieldsValue({
       ...record,
     });
@@ -296,50 +331,49 @@ const Users = () => {
     form.resetFields();
   };
 
-  // Submit Handler for Modal Form (Handles both Add & Edit)
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      const payload = {
-        ...values,
-        date: reportDate,
-      };
       const isEditing = Boolean(editingKey);
-      const previousReport = isEditing ? dataSource.find((item) => item.key === editingKey) : null;
+      const previousReport = isEditing ? reports.find((item) => item.key === editingKey) : null;
       const temporaryKey = isEditing ? editingKey : `pending-${Date.now()}`;
       const optimisticReport = {
-        ...(previousReport || { trip1Image: null, trip2Image: null, trip3Image: null }),
-        ...payload,
+        ...(previousReport || {
+          trip1Image: null,
+          trip2Image: null,
+          trip3Image: null,
+          trip4Image: null,
+          trip5Image: null,
+        }),
+        ...values,
         _id: temporaryKey,
         key: temporaryKey,
-        sr: previousReport?.sr ?? dataSource.length + 1,
+        sr: previousReport?.sr ?? reports.length + 1,
       };
 
-      setReportsByDate((current) => ({
-        ...current,
-        [reportDate]: isEditing
-          ? (current[reportDate] || []).map((item) => (item.key === editingKey ? optimisticReport : item))
-          : [...(current[reportDate] || []), optimisticReport],
-      }));
+      setReports((current) =>
+        isEditing
+          ? current.map((item) => (item.key === editingKey ? optimisticReport : item))
+          : [...current, optimisticReport],
+      );
 
       try {
-        const report = isEditing
-          ? await apiRequest(`/reports/${editingKey}`, { method: "PATCH", body: payload })
-          : await apiRequest("/reports", { method: "POST", body: payload });
-        setReportsByDate((current) => ({
-          ...current,
-          [reportDate]: (current[reportDate] || []).map((item) =>
-            item.key === temporaryKey ? { ...report, key: report._id, sr: item.sr } : item,
+        const savedReport = isEditing
+          ? await apiRequest(`/reports/${editingKey}`, { method: "PATCH", body: values })
+          : await apiRequest("/reports", { method: "POST", body: values });
+
+        setReports((current) =>
+          current.map((item) =>
+            item.key === temporaryKey ? { ...savedReport, key: savedReport._id, sr: item.sr } : item,
           ),
-        }));
-        message.success(isEditing ? "Record updated successfully!" : "New report entry added!");
+        );
+        message.success(isEditing ? "Record updated successfully!" : "New vehicle record added!");
       } catch (error) {
-        setReportsByDate((current) => ({
-          ...current,
-          [reportDate]: isEditing
-            ? (current[reportDate] || []).map((item) => (item.key === editingKey ? previousReport : item))
-            : (current[reportDate] || []).filter((item) => item.key !== temporaryKey),
-        }));
+        setReports((current) =>
+          isEditing
+            ? current.map((item) => (item.key === editingKey ? previousReport : item))
+            : current.filter((item) => item.key !== temporaryKey),
+        );
         throw error;
       }
 
@@ -352,16 +386,13 @@ const Users = () => {
   };
 
   const handleDeleteRow = async (key) => {
-    const previousData = dataSource;
-    setReportsByDate((current) => ({
-      ...current,
-      [reportDate]: (current[reportDate] || []).filter((item) => item.key !== key).map(normalizeReport),
-    }));
+    const previousData = reports;
+    setReports((current) => current.filter((item) => item.key !== key).map(normalizeReport));
     try {
       await apiRequest(`/reports/${key}`, { method: "DELETE" });
-      message.success("Record deleted successfully!");
+      message.success("Vehicle record deleted successfully!");
     } catch (error) {
-      setReportsByDate((current) => ({ ...current, [reportDate]: previousData }));
+      setReports(previousData);
       message.error(error.message);
     }
   };
@@ -370,7 +401,9 @@ const Users = () => {
   const textColumnFilters = (field) => makeColumnFilters(visibleDataSource, (record) => record[field]);
   const imageColumnFilters = (field) =>
     makeColumnFilters(visibleDataSource, (record) => (record[field] ? "Uploaded" : "Missing"));
-  const tripCount = (record) => [record.trip1Image, record.trip2Image, record.trip3Image].filter(Boolean).length;
+  const tripFields = ["trip1Image", "trip2Image", "trip3Image", "trip4Image", "trip5Image"];
+  const tripCount = (record) =>
+    tripFields.filter((field) => Boolean(imagePreviews[`${record.key}:${field}`] || record[field])).length;
   const searchedDataSource = visibleDataSource.filter((record) =>
     String(record.vehicleNo || "")
       .toLowerCase()
@@ -403,8 +436,14 @@ const Users = () => {
         }
       });
       const rows = searchedDataSource.map((record) => {
-        const trips = [record.trip1Image, record.trip2Image, record.trip3Image];
-        const tripCount = trips.filter(Boolean).length;
+        const trips = [
+          record.trip1Image,
+          record.trip2Image,
+          record.trip3Image,
+          record.trip4Image,
+          record.trip5Image,
+        ];
+        const count = trips.filter(Boolean).length;
         return [
           record.sr,
           record.amo || "",
@@ -415,30 +454,29 @@ const Users = () => {
           "",
           "",
           "",
-          tripCount,
-          tripCount > 0 ? "YES" : "NO",
+          "",
+          "",
+          count,
+          count > 0 ? "YES" : "NO",
           record.remarks || "",
         ];
       });
-      const columnWidths = [8, 28, 10, 30, 22, 22, 18, 18, 18, 14, 18, 30];
+      const columnWidths = [8, 28, 10, 30, 22, 22, 20, 20, 20, 20, 20, 14, 18, 30];
 
       worksheet.columns = exportHeaders.map((header, index) => ({
         header,
         key: `column${index + 1}`,
         width: columnWidths[index],
       }));
-      worksheet.mergeCells("A1:F1");
-      worksheet.mergeCells("G1:L1");
-      worksheet.getCell("A1").value = "Daily trip report";
-      worksheet.getCell("A1").font = { name: "Times New Roman", bold: true, size: 20, align: "center" };
-      worksheet.getCell("A1").alignment = { horizontal: "left", vertical: "middle" };
-      worksheet.getCell("G1").value = `Date: ${reportDate}`;
-      worksheet.getCell("G1").font = { name: "Times New Roman", bold: true, size: 14 };
-      worksheet.getCell("G1").alignment = { horizontal: "right", vertical: "middle" };
+      worksheet.mergeCells("A1:N1");
+      worksheet.getCell("A1").value = `Daily Trip Report of Loader Rickshaw | Date: ${todayDate}`;
       worksheet.getRow(1).eachCell({ includeEmpty: true }, (cell) => {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } };
+        cell.font = { name: "Times New Roman", bold: true, size: 20, color: { argb: "FF1F4E78" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF87CEEB" } };
+        cell.border = { top: border, right: border, bottom: border, left: border };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
       });
-      worksheet.getRow(1).height = 60;
+      worksheet.getRow(1).height = 32;
 
       const headerRow = worksheet.getRow(2);
       headerRow.values = exportHeaders;
@@ -450,57 +488,67 @@ const Users = () => {
         cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       });
 
-      let failedImageCount = 0;
-      for (let index = 0; index < rows.length; index += 1) {
-        const rowNumber = index + 3;
-        const row = worksheet.getRow(rowNumber);
-        row.values = rows[index];
-        row.height = 60;
-        const amoKey = String(searchedDataSource[index].amo || "Unassigned AMO")
-          .trim()
-          .toLocaleLowerCase();
-        const amoFill = amoFillByName.get(amoKey);
-        row.eachCell({ includeEmpty: true }, (cell, columnNumber) => {
-          cell.font = { name: "Times New Roman", bold: true, size: 14 };
-          if (columnNumber === 2) {
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: amoFill } };
-          }
+      rows.forEach((rowValues) => {
+        const row = worksheet.addRow(rowValues);
+        row.height = 65;
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          cell.font = { name: "Times New Roman", bold: true, size: 12 };
           cell.border = { top: border, right: border, bottom: border, left: border };
           cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-        });
 
-        const tripImages = [
-          { image: searchedDataSource[index].trip1Image, column: "G" },
-          { image: searchedDataSource[index].trip2Image, column: "H" },
-          { image: searchedDataSource[index].trip3Image, column: "I" },
-        ];
-        const embeddedImages = await Promise.all(
-          tripImages.map(async ({ image, column }) => {
-            if (!image?.url) return null;
+          if (colNumber === 2) {
+            const amoKey = String(rowValues[1] || "Unassigned AMO")
+              .trim()
+              .toLocaleLowerCase();
+            const fgColor = amoFillByName.get(amoKey) || "FFF2F3F5";
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fgColor } };
+          }
+        });
+      });
+
+      let failedImageCount = 0;
+      const imageJobs = searchedDataSource.flatMap((record, rowIndex) =>
+        [
+          record.trip1Image,
+          record.trip2Image,
+          record.trip3Image,
+          record.trip4Image,
+          record.trip5Image,
+        ]
+          .map((image, tripIndex) => (image?.url ? { imageUrl: image.url, rowIndex, tripIndex } : null))
+          .filter(Boolean),
+      );
+
+      // Download in batches of 6 to prevent network timeouts/drops
+      const batchSize = 6;
+      const embeddedImages = [];
+      for (let i = 0; i < imageJobs.length; i += batchSize) {
+        const batch = imageJobs.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batch.map(async (job) => {
             try {
-              const response = await fetch(image.url);
-              if (!response.ok) throw new Error("Unable to load image");
-              const bitmap = await createImageBitmap(await response.blob());
-              const scale = Math.min(1, 120 / bitmap.width, 75 / bitmap.height);
-              const canvas = document.createElement("canvas");
-              canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-              canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-              canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-              bitmap.close();
-              return {
-                id: workbook.addImage({ base64: canvas.toDataURL("image/png"), extension: "png" }),
-                range: `${column}${rowNumber}:${column}${rowNumber}`,
-              };
+              return { ...job, ...(await addExcelImage(workbook, job.imageUrl)) };
             } catch {
               failedImageCount += 1;
               return null;
             }
           }),
         );
-        embeddedImages.forEach((image) => {
-          if (image) worksheet.addImage(image.id, image.range);
-        });
+        embeddedImages.push(...batchResults);
       }
+
+      embeddedImages.filter(Boolean).forEach(({ imageId, width, height, rowIndex, tripIndex }) => {
+        // High quality preview fitting neatly inside cell
+        const scale = Math.min(136 / width, 78 / height, 1);
+        const scaledWidth = Math.round(width * scale);
+        const scaledHeight = Math.round(height * scale);
+
+        worksheet.addImage(imageId, {
+          tl: { col: tripIndex + 6 + 0.04, row: rowIndex + 2 + 0.05 },
+          ext: { width: scaledWidth, height: scaledHeight },
+          editAs: "oneCell",
+        });
+      });
 
       const lastDataRow = Math.max(2, rows.length + 2);
       const totalRow = worksheet.getRow(lastDataRow + 1);
@@ -510,18 +558,18 @@ const Users = () => {
         cell.border = { top: border, right: border, bottom: border, left: border };
         cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       });
-      worksheet.mergeCells(`A${totalRow.number}:H${totalRow.number}`);
-      worksheet.mergeCells(`I${totalRow.number}:L${totalRow.number}`);
+      worksheet.mergeCells(`A${totalRow.number}:K${totalRow.number}`);
+      worksheet.mergeCells(`L${totalRow.number}:N${totalRow.number}`);
       const grandTotalLabel = worksheet.getCell(`A${totalRow.number}`);
       grandTotalLabel.value = "Grand Total";
       grandTotalLabel.font = { name: "Times New Roman", bold: true, size: 26 };
       grandTotalLabel.alignment = { horizontal: "center", vertical: "middle" };
       grandTotalLabel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFC0CB" } };
-      const grandTotalValue = worksheet.getCell(`I${totalRow.number}`);
+      const grandTotalValue = worksheet.getCell(`L${totalRow.number}`);
       grandTotalValue.font = { name: "Times New Roman", bold: true, size: 26 };
       grandTotalValue.alignment = { horizontal: "center", vertical: "middle" };
       grandTotalValue.value = rows.length
-        ? { formula: `SUM(J3:J${lastDataRow})`, result: rows.reduce((sum, row) => sum + Number(row[9] || 0), 0) }
+        ? { formula: `SUM(L3:L${lastDataRow})`, result: rows.reduce((sum, row) => sum + Number(row[11] || 0), 0) }
         : 0;
       grandTotalValue.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF87CEEB" } };
 
@@ -531,7 +579,7 @@ const Users = () => {
         fitToPage: true,
         fitToWidth: 1,
         fitToHeight: 0,
-        printArea: `A1:L${totalRow.number}`,
+        printArea: `A1:N${totalRow.number}`,
         printTitlesRow: "2:2",
       };
 
@@ -541,11 +589,14 @@ const Users = () => {
       );
       const link = document.createElement("a");
       link.href = url;
-      link.download = `Daily-Trip-Report-${reportDate}.xlsx`;
+      link.download = `Daily-Trip-Report-${todayDate}.xlsx`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      message.success("Excel exported successfully.");
-      if (failedImageCount) message.warning(`${failedImageCount} image(s) could not be included.`);
+      if (failedImageCount) {
+        message.warning(`Excel exported, but ${failedImageCount} image(s) could not be included.`);
+      } else {
+        message.success("Excel exported successfully.");
+      }
     } catch {
       message.error("Unable to export Excel file.");
     } finally {
@@ -570,12 +621,12 @@ const Users = () => {
       key: "vehicleNo",
       ...textColumnFilters("vehicleNo"),
     },
-
     {
       title: "Trip 01",
       dataIndex: "trip1Image",
       key: "trip1Image",
       align: "center",
+      width: 95,
       ...imageColumnFilters("trip1Image"),
       render: (img, record) => renderTableImageCell(img?.url, record, "trip1Image", "Trip 01"),
     },
@@ -584,6 +635,7 @@ const Users = () => {
       dataIndex: "trip2Image",
       key: "trip2Image",
       align: "center",
+      width: 95,
       ...imageColumnFilters("trip2Image"),
       render: (img, record) => renderTableImageCell(img?.url, record, "trip2Image", "Trip 02"),
     },
@@ -592,25 +644,44 @@ const Users = () => {
       dataIndex: "trip3Image",
       key: "trip3Image",
       align: "center",
+      width: 95,
       ...imageColumnFilters("trip3Image"),
       render: (img, record) => renderTableImageCell(img?.url, record, "trip3Image", "Trip 03"),
+    },
+    {
+      title: "Trip 04",
+      dataIndex: "trip4Image",
+      key: "trip4Image",
+      align: "center",
+      width: 95,
+      ...imageColumnFilters("trip4Image"),
+      render: (img, record) => renderTableImageCell(img?.url, record, "trip4Image", "Trip 04"),
+    },
+    {
+      title: "Trip 05",
+      dataIndex: "trip5Image",
+      key: "trip5Image",
+      align: "center",
+      width: 95,
+      ...imageColumnFilters("trip5Image"),
+      render: (img, record) => renderTableImageCell(img?.url, record, "trip5Image", "Trip 05"),
     },
     {
       title: "Total Trips",
       key: "totalTrips",
       align: "center",
-      width: 100,
+      width: 105,
       ...makeColumnFilters(visibleDataSource, (record) => tripCount(record)),
       render: (_, record) => {
         const count = tripCount(record);
         let tagColor = "error";
-        if (count === 3) tagColor = "success";
-        else if (count === 2) tagColor = "processing";
-        else if (count === 1) tagColor = "warning";
+        if (count === 5) tagColor = "success";
+        else if (count >= 3) tagColor = "processing";
+        else if (count >= 1) tagColor = "warning";
 
         return (
           <Tag color={tagColor} style={{ fontWeight: "bold", padding: "2px 8px" }}>
-            {count} / 3
+            {count} / 5
           </Tag>
         );
       },
@@ -622,7 +693,7 @@ const Users = () => {
       width: 110,
       ...makeColumnFilters(visibleDataSource, (record) => (tripCount(record) > 0 ? "YES" : "NO")),
       render: (_, record) => {
-        const isAchieved = Boolean(record.trip1Image) || Boolean(record.trip2Image) || Boolean(record.trip3Image);
+        const isAchieved = tripCount(record) > 0;
         return isAchieved ? (
           <Tag color="success" style={{ fontWeight: "bold", padding: "2px 8px" }}>
             YES
@@ -641,17 +712,14 @@ const Users = () => {
       align: "center",
       render: (_, record) => (
         <Space size="small">
-          {/* Edit Button */}
           <Button
             type="text"
             icon={<EditOutlined style={{ color: "#1890ff" }} />}
             onClick={() => handleEditClick(record)}
           />
-
-          {/* Delete Row with Popconfirm */}
           <Popconfirm
             title="Delete Record"
-            description="Are you sure you want to delete this row?"
+            description="Are you sure you want to delete this vehicle record permanently?"
             onConfirm={() => handleDeleteRow(record.key)}
             okText="Yes"
             cancelText="No"
@@ -676,6 +744,9 @@ const Users = () => {
           <Space direction="vertical" align="end">
             <div className="fw-semibold">{`Today · ${todayDate}`}</div>
             <Space wrap>
+              <Button icon={<ReloadOutlined />} onClick={() => setRefreshVersion((v) => v + 1)} title="Refresh Records">
+                Refresh
+              </Button>
               <Button icon={<FileExcelOutlined />} loading={isExporting} onClick={handleExportExcel}>
                 Export Excel
               </Button>
@@ -686,7 +757,6 @@ const Users = () => {
           </Space>
         </Col>
       </Row>
-      {/* Main Table */}
 
       <Row className="mb-2">
         <Col xs={24} md={8}>
@@ -706,7 +776,9 @@ const Users = () => {
         loading={isLoading}
         bordered
         pagination={{ pageSize: 10 }}
+        scroll={{ x: 1350 }}
       />
+
       {/* Shared Modal for Add & Edit */}
       <Modal
         title={editingKey ? "Edit Vehicle Record" : "Add New Vehicle Record"}

@@ -22,7 +22,8 @@ const getPakistanDate = () => {
   return `${values.year}-${values.month}-${values.day}`;
 };
 
-const getTripCount = (report) => [report.trip1Image, report.trip2Image, report.trip3Image].filter(Boolean).length;
+const getTripCount = (report) =>
+  [report.trip1Image, report.trip2Image, report.trip3Image, report.trip4Image, report.trip5Image].filter(Boolean).length;
 
 const amoColors = [
   { name: "haq nawaz", color: "#CCC0DA" },
@@ -60,10 +61,10 @@ const Progress = () => {
   useEffect(() => {
     let isMounted = true;
 
-    apiRequest(`/reports?date=${today}`, { skipMemoryCache: refreshVersion > 0 })
+    apiRequest("/reports", { skipMemoryCache: refreshVersion > 0 })
       .then((data) => {
         if (!isMounted) return;
-        setReports(data);
+        setReports(data || []);
         setLoadedDate(today);
         setHasError(false);
       })
@@ -76,7 +77,7 @@ const Progress = () => {
     return () => {
       isMounted = false;
     };
-  }, [today, refreshVersion]);
+  }, [refreshVersion]);
 
   const groups = [
     ...reports
@@ -172,7 +173,9 @@ const Progress = () => {
       });
       worksheet.mergeCells(`A${totalRow.number}:B${totalRow.number}`);
       worksheet.getCell(`A${totalRow.number}`).value = "Grand Total";
-      worksheet.getCell(`A${totalRow.number}`).font = { name: "Times New Roman", bold: true, size: 20 };
+      worksheet.getCell(`A${totalRow.number}`).font = { name: "Times New Roman", bold: true, size: 14 };
+      worksheet.getCell(`A${totalRow.number}`).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+
       worksheet.getCell(`A${totalRow.number}`).fill = {
         type: "pattern",
         pattern: "solid",
@@ -182,11 +185,19 @@ const Progress = () => {
         const cell = worksheet.getCell(totalRow.number, index + 3);
         cell.value = value;
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF87CEEB" } };
+        cell.font = { name: "Times New Roman", bold: true, size: 20 };
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       });
-      worksheet.getCell(totalRow.number, 6).value = totalVehicles
+      const percentageCell = worksheet.getCell(totalRow.number, 6);
+      percentageCell.value = totalVehicles
         ? `${Math.round((totalArchived / totalVehicles) * 100)}%`
         : "0%";
+      percentageCell.font = { name: "Times New Roman", bold: true, size: 20 };
+      percentageCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF87CEEB" } };
+      percentageCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       worksheet.getCell(totalRow.number, 7).value = "Daily total";
+      worksheet.getCell(`A${totalRow.number}`).font = { name: "Times New Roman", bold: true, size: 14 };
+      worksheet.getCell(`A${totalRow.number}`).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
 
       worksheet.views = [{ state: "frozen", ySplit: 2, topLeftCell: "A3", showGridLines: true }];
       worksheet.pageSetup = {

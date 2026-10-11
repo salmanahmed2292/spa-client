@@ -15,7 +15,8 @@ const getPakistanDate = () => {
   return `${values.year}-${values.month}-${values.day}`;
 };
 
-const countTrips = (report) => [report.trip1Image, report.trip2Image, report.trip3Image].filter(Boolean).length;
+const countTrips = (report) =>
+  [report.trip1Image, report.trip2Image, report.trip3Image, report.trip4Image, report.trip5Image].filter(Boolean).length;
 
 const metrics = [
   { key: "vehicles", label: "Total Vehicles", icon: CarOutlined, tone: "green" },
@@ -44,10 +45,10 @@ const Home = () => {
 
   useEffect(() => {
     let isMounted = true;
-    apiRequest(`/reports?date=${today}`, { skipMemoryCache: refreshVersion > 0 })
+    apiRequest("/reports", { skipMemoryCache: refreshVersion > 0 })
       .then((data) => {
         if (!isMounted) return;
-        setReports(data);
+        setReports(data || []);
         setHasError(false);
         setLoadedDate(today);
       })
@@ -60,7 +61,7 @@ const Home = () => {
     return () => {
       isMounted = false;
     };
-  }, [today, refreshVersion]);
+  }, [refreshVersion]);
 
   const totalTrips = reports.reduce((total, report) => total + countTrips(report), 0);
   const archived = reports.filter((report) => countTrips(report) > 0).length;
