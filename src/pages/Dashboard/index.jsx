@@ -49,16 +49,16 @@ const Dashboard = () => {
       >
         <div className="dashboard-brand">
           <img
-            src="/suthra-logo.webp"
-            alt="Suthra Punjab"
+            src="/punjab-logo.jpg"
+            alt="Government of Punjab"
             className="dashboard-brand-logo"
             style={{
-              height: "42px",
-              maxWidth: "58px",
+              height: "44px",
+              width: "44px",
               objectFit: "contain",
-              borderRadius: "8px",
+              borderRadius: "50%",
               background: "#ffffff",
-              padding: "2px 4px",
+              padding: "2px",
             }}
           />
           <div className="dashboard-brand-copy">

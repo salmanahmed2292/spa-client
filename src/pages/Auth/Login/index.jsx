@@ -52,22 +52,12 @@ const Login = () => {
         <div className="card rounded-0 border-0 z-1 p-2">
           <div className="container">
             <Row className="d-flex justify-content-center align-items-center">
-              <Col span={24} className="text-center pt-3 pb-2">
-                <img
-                  src="/suthra-logo.webp"
-                  alt="Suthra Punjab"
-                  style={{
-                    maxHeight: "75px",
-                    maxWidth: "160px",
-                    objectFit: "contain",
-                    display: "block",
-                    margin: "0 auto",
-                  }}
-                />
+              <Col span={24} className="text-center py-3">
+                <LoginOutlined style={{ fontSize: "40px", color: "#3ce2d7" }} />
               </Col>
               <Col span={24}>
-                <Title className="text-center pb-3 fw-normal" level={3}>
-                  Suthra Punjab Portal
+                <Title className="text-center pb-3 fw-normal" level={2}>
+                  Sign In
                 </Title>
               </Col>
               <Col span={24}>
