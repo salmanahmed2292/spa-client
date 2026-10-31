@@ -229,33 +229,33 @@ const Progress = () => {
         cell.border = { top: border, right: border, bottom: border, left: border };
         cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       });
-      worksheet.mergeCells(`A${totalRow.number}:B${totalRow.number}`);
-      worksheet.getCell(`A${totalRow.number}`).value = "Grand Total";
-      worksheet.getCell(`A${totalRow.number}`).font = { name: "Times New Roman", bold: true, size: 14 };
-      worksheet.getCell(`A${totalRow.number}`).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-
-      worksheet.getCell(`A${totalRow.number}`).fill = {
+      const grandTotalFill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FFFFC0CB" },
+        fgColor: { argb: "FF1F4E79" },
       };
+      const grandTotalFont = { name: "Times New Roman", bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+
+      for (let col = 1; col <= 7; col++) {
+        const cell = worksheet.getCell(totalRow.number, col);
+        cell.fill = grandTotalFill;
+        cell.font = grandTotalFont;
+        cell.border = { top: border, right: border, bottom: border, left: border };
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      }
+
+      worksheet.mergeCells(`A${totalRow.number}:B${totalRow.number}`);
+      worksheet.getCell(`A${totalRow.number}`).value = "Grand Total";
+
       [totalVehicles, totalArchived, totalTrips].forEach((value, index) => {
         const cell = worksheet.getCell(totalRow.number, index + 3);
         cell.value = value;
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF87CEEB" } };
-        cell.font = { name: "Times New Roman", bold: true, size: 20 };
-        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       });
       const percentageCell = worksheet.getCell(totalRow.number, 6);
       percentageCell.value = totalVehicles
         ? `${Math.round((totalArchived / totalVehicles) * 100)}%`
         : "0%";
-      percentageCell.font = { name: "Times New Roman", bold: true, size: 20 };
-      percentageCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF87CEEB" } };
-      percentageCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       worksheet.getCell(totalRow.number, 7).value = "Daily total";
-      worksheet.getCell(`A${totalRow.number}`).font = { name: "Times New Roman", bold: true, size: 14 };
-      worksheet.getCell(`A${totalRow.number}`).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
 
       worksheet.views = [{ state: "frozen", ySplit: 2, topLeftCell: "A3", showGridLines: true }];
       worksheet.pageSetup = {

@@ -442,7 +442,7 @@ const Users = () => {
           record.remarks || "",
         ];
       });
-      const columnWidths = [8, 28, 10, 30, 22, 20, 20, 20, 20, 20, 14, 18, 30];
+      const columnWidths = [8, 28, 10, 30, 22, 20, 20, 20, 20, 20, 16, 22, 30];
 
       worksheet.columns = exportHeaders.map((header, index) => ({
         header,
@@ -526,25 +526,40 @@ const Users = () => {
       const lastDataRow = Math.max(2, rows.length + 2);
       const totalRow = worksheet.getRow(lastDataRow + 1);
       totalRow.height = 60;
-      totalRow.eachCell({ includeEmpty: true }, (cell) => {
-        cell.font = { name: "Times New Roman", bold: true, size: 14 };
+
+      const grandTotalFont = {
+        name: "Times New Roman",
+        bold: true,
+        size: 26,
+        color: { argb: "FFFFFFFF" },
+      };
+      const grandTotalFill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF1F4E79" },
+      };
+
+      for (let col = 1; col <= 13; col++) {
+        const cell = worksheet.getCell(totalRow.number, col);
+        cell.font = grandTotalFont;
+        cell.fill = grandTotalFill;
         cell.border = { top: border, right: border, bottom: border, left: border };
-        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-      });
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      }
+
       worksheet.mergeCells(`A${totalRow.number}:J${totalRow.number}`);
-      worksheet.mergeCells(`K${totalRow.number}:M${totalRow.number}`);
       const grandTotalLabel = worksheet.getCell(`A${totalRow.number}`);
       grandTotalLabel.value = "Grand Total";
-      grandTotalLabel.font = { name: "Times New Roman", bold: true, size: 26 };
-      grandTotalLabel.alignment = { horizontal: "center", vertical: "middle" };
-      grandTotalLabel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFC0CB" } };
-      const grandTotalValue = worksheet.getCell(`K${totalRow.number}`);
-      grandTotalValue.font = { name: "Times New Roman", bold: true, size: 26 };
-      grandTotalValue.alignment = { horizontal: "center", vertical: "middle" };
-      grandTotalValue.value = rows.length
-        ? { formula: `SUM(K3:K${lastDataRow})`, result: rows.reduce((sum, row) => sum + Number(row[10] || 0), 0) }
+
+      const totalTripsSum = rows.reduce((sum, row) => sum + Number(row[10] || 0), 0);
+      const totalTripsCell = worksheet.getCell(`K${totalRow.number}`);
+      totalTripsCell.value = rows.length
+        ? { formula: `SUM(K3:K${lastDataRow})`, result: totalTripsSum }
         : 0;
-      grandTotalValue.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF87CEEB" } };
+
+      const archivedCount = rows.filter((row) => row[11] === "YES").length;
+      const archiveRatioCell = worksheet.getCell(`L${totalRow.number}`);
+      archiveRatioCell.value = `${archivedCount} / ${rows.length}`;
 
       worksheet.views = [{ state: "frozen", ySplit: 2, topLeftCell: "A3", showGridLines: true }];
       worksheet.pageSetup = {
@@ -587,7 +602,6 @@ const Users = () => {
       key: "supervisor",
       ...textColumnFilters("supervisor"),
     },
-    { title: "TCP", dataIndex: "tcp", key: "tcp", ...textColumnFilters("tcp") },
     {
       title: "Vehicle / Rickshaw No",
       dataIndex: "vehicleNo",
@@ -781,23 +795,18 @@ const Users = () => {
           </Row>
 
           <Row gutter={16}>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item name="uc" label="UC" rules={[{ required: true, message: "Please enter UC" }]}>
                 <Input placeholder="e.g. 8" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 name="vehicleNo"
                 label="Vehicle / Rickshaw No"
                 rules={[{ required: true, message: "Please enter Vehicle No" }]}
               >
                 <Input placeholder="e.g. OKR-LR-050" />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="tcp" label="TCP">
-                <Input placeholder="e.g. TCP-SATGARAH" />
               </Form.Item>
             </Col>
           </Row>
