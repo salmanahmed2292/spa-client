@@ -13,14 +13,14 @@ import { Button, Card, Col, Empty, Form, Input, Modal, Progress as AntProgress, 
 import apiRequest from "../../../lib/api.js";
 
 const getPakistanDate = () => {
-  const parts = new Intl.DateTimeFormat("en-CA", {
+  const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Karachi",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(new Date());
   const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-  return `${values.year}-${values.month}-${values.day}`;
+  return `${values.day}-${values.month}-${values.year}`;
 };
 
 const getTripCount = (report) =>
@@ -259,12 +259,13 @@ const Progress = () => {
 
       worksheet.views = [{ state: "frozen", ySplit: 2, topLeftCell: "A3", showGridLines: true }];
       worksheet.pageSetup = {
-        orientation: "landscape",
+        orientation: "portrait",
         fitToPage: true,
         fitToWidth: 1,
         fitToHeight: 0,
+        paperSize: 9,
         printArea: `A1:G${totalRow.number}`,
-        printTitlesRow: "2:2",
+        printTitlesRow: "1:2",
       };
 
       const buffer = await workbook.xlsx.writeBuffer();

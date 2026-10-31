@@ -12,14 +12,14 @@ import apiRequest from "../../../lib/api.js";
 import prepareImageUpload from "../../../lib/prepareImageUpload.js";
 
 const getPakistanDate = () => {
-  const parts = new Intl.DateTimeFormat("en-CA", {
+  const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Karachi",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(new Date());
   const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-  return `${values.year}-${values.month}-${values.day}`;
+  return `${values.day}-${values.month}-${values.year}`;
 };
 
 const normalizeReport = (report, index) => ({ ...report, key: report._id, sr: index + 1 });
@@ -36,7 +36,7 @@ const exportHeaders = [
   "Trip 04",
   "Trip 05",
   "Total Trips",
-  "Trip Achieved",
+  "Trip Archived",
   "Remarks",
 ];
 
@@ -438,7 +438,7 @@ const Users = () => {
           "",
           "",
           count,
-          count > 0 ? "YES" : "NO",
+          count > 0 ? "Yes" : "No",
           record.remarks || "",
         ];
       });
@@ -557,18 +557,19 @@ const Users = () => {
         ? { formula: `SUM(K3:K${lastDataRow})`, result: totalTripsSum }
         : 0;
 
-      const archivedCount = rows.filter((row) => row[11] === "YES").length;
+      const archivedCount = rows.filter((row) => row[11] === "Yes").length;
       const archiveRatioCell = worksheet.getCell(`L${totalRow.number}`);
       archiveRatioCell.value = `${archivedCount} / ${rows.length}`;
 
       worksheet.views = [{ state: "frozen", ySplit: 2, topLeftCell: "A3", showGridLines: true }];
       worksheet.pageSetup = {
-        orientation: "landscape",
+        orientation: "portrait",
         fitToPage: true,
         fitToWidth: 1,
         fitToHeight: 0,
+        paperSize: 9,
         printArea: `A1:M${totalRow.number}`,
-        printTitlesRow: "2:2",
+        printTitlesRow: "1:2",
       };
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -674,20 +675,20 @@ const Users = () => {
       },
     },
     {
-      title: "Trip Achieved",
-      key: "tripAchieved",
+      title: "Trip Archived",
+      key: "tripArchived",
       align: "center",
       width: 110,
-      ...makeColumnFilters(visibleDataSource, (record) => (tripCount(record) > 0 ? "YES" : "NO")),
+      ...makeColumnFilters(visibleDataSource, (record) => (tripCount(record) > 0 ? "Yes" : "No")),
       render: (_, record) => {
         const isAchieved = tripCount(record) > 0;
         return isAchieved ? (
           <Tag color="success" style={{ fontWeight: "bold", padding: "2px 8px" }}>
-            YES
+            Yes
           </Tag>
         ) : (
           <Tag color="error" style={{ fontWeight: "bold", padding: "2px 8px" }}>
-            NO
+            No
           </Tag>
         );
       },
