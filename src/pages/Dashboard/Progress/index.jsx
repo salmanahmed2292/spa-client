@@ -3,12 +3,13 @@ import {
   BarChartOutlined,
   CarOutlined,
   CheckCircleOutlined,
+  EditOutlined,
   FileExcelOutlined,
   ReloadOutlined,
   TeamOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Col, Empty, Progress as AntProgress, Row, Spin, Statistic, Typography, message } from "antd";
+import { Button, Card, Col, Empty, Form, Input, Modal, Progress as AntProgress, Row, Spin, Statistic, Typography, message } from "antd";
 import apiRequest from "../../../lib/api.js";
 
 const getPakistanDate = () => {
@@ -47,6 +48,10 @@ const Progress = () => {
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [hasError, setHasError] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [amoForm] = Form.useForm();
+  const [isAmoModalOpen, setIsAmoModalOpen] = useState(false);
+  const [editingAmo, setEditingAmo] = useState(null);
+  const [isSavingAmo, setIsSavingAmo] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -78,6 +83,64 @@ const Progress = () => {
       isMounted = false;
     };
   }, [refreshVersion]);
+
+  const handleEditAmo = (group) => {
+    const matchingReport = reports.find((r) => (r.amo || "").trim() === group.amo);
+    setEditingAmo(group.amo);
+    amoForm.setFieldsValue({
+      amo: group.amo,
+      tcp: matchingReport?.tcp || "",
+    });
+    setIsAmoModalOpen(true);
+  };
+
+  const handleAmoModalCancel = () => {
+    setIsAmoModalOpen(false);
+    setEditingAmo(null);
+    amoForm.resetFields();
+  };
+
+  const handleAmoSubmit = async () => {
+    try {
+      const values = await amoForm.validateFields();
+      const oldAmo = editingAmo;
+      const newAmo = values.amo.trim();
+      const newTcp = values.tcp !== undefined ? values.tcp.trim() : undefined;
+
+      setIsSavingAmo(true);
+      await apiRequest("/reports/amo/update", {
+        method: "PATCH",
+        body: {
+          oldAmo,
+          newAmo,
+          tcp: newTcp,
+        },
+      });
+
+      setReports((current) =>
+        current.map((item) => {
+          if ((item.amo || "").trim() === oldAmo) {
+            return {
+              ...item,
+              amo: newAmo,
+              ...(newTcp !== undefined ? { tcp: newTcp } : {}),
+            };
+          }
+          return item;
+        }),
+      );
+
+      message.success(`AMO updated to "${newAmo}" successfully!`);
+      setIsAmoModalOpen(false);
+      setEditingAmo(null);
+      amoForm.resetFields();
+    } catch (error) {
+      if (error.errorFields) return;
+      message.error(error.message || "Failed to update AMO.");
+    } finally {
+      setIsSavingAmo(false);
+    }
+  };
 
   const groups = [
     ...reports
@@ -325,8 +388,20 @@ const Progress = () => {
                         <span className="progress-amo-icon">
                           <TeamOutlined />
                         </span>
-                        <div>
-                          <Typography.Text className="progress-amo-label">AMO</Typography.Text>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                            <Typography.Text className="progress-amo-label">AMO</Typography.Text>
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<EditOutlined style={{ color: "#1677ff", fontSize: "13px" }} />}
+                              onClick={() => handleEditAmo(group)}
+                              title="Edit AMO"
+                              style={{ padding: "0 6px", height: "22px", borderRadius: "4px" }}
+                            >
+                              <span style={{ fontSize: "11px", color: "#1677ff", marginLeft: 2 }}>Edit</span>
+                            </Button>
+                          </div>
                           <Typography.Title
                             level={5}
                             className="progress-amo-name"
@@ -363,6 +438,34 @@ const Progress = () => {
           </Row>
         </>
       )}
+
+      {/* Modal to edit AMO */}
+      <Modal
+        title={`Edit AMO: ${editingAmo || ""}`}
+        open={isAmoModalOpen}
+        onOk={handleAmoSubmit}
+        onCancel={handleAmoModalCancel}
+        confirmLoading={isSavingAmo}
+        okText="Update AMO"
+        width={500}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 16, color: "#666", fontSize: "13px", lineHeight: "1.5" }}>
+          Editing this AMO will update all associated vehicle records in the database and automatically reflect on the <strong>Users/Workers</strong> page.
+        </div>
+        <Form form={amoForm} layout="vertical">
+          <Form.Item
+            name="amo"
+            label="AMO Name & Contact"
+            rules={[{ required: true, message: "Please enter AMO name & contact" }]}
+          >
+            <Input placeholder="e.g. Haq Nawaz 0345-7538817" />
+          </Form.Item>
+          <Form.Item name="tcp" label="TCP">
+            <Input placeholder="e.g. TCP-SATGARAH" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </main>
   );
 };

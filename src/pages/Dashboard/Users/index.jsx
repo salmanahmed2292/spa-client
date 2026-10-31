@@ -418,23 +418,6 @@ const Users = () => {
       workbook.calcProperties = { fullCalcOnLoad: true, forceFullCalc: true };
       const worksheet = workbook.addWorksheet("Vehicle Reports");
       const border = { style: "thin", color: { argb: "FF000000" } };
-      const amoColors = [
-        { name: "haq nawaz", color: "FFCCC0DA" },
-        { name: "fiaz", color: "FF92CDDC" },
-        { name: "ahsan", color: "FFFABF8F" },
-        { name: "gazanfar", color: "FF92D050" },
-        { name: "adeel", color: "FFDA9694" },
-      ];
-      const amoFillByName = new Map();
-      visibleDataSource.forEach((record) => {
-        const amoKey = String(record.amo || "Unassigned AMO")
-          .trim()
-          .toLocaleLowerCase();
-        if (!amoFillByName.has(amoKey)) {
-          const match = amoColors.find(({ name }) => amoKey.includes(name));
-          amoFillByName.set(amoKey, match?.color || "FFF2F3F5");
-        }
-      });
       const rows = searchedDataSource.map((record) => {
         const trips = [
           record.trip1Image,
@@ -491,18 +474,10 @@ const Users = () => {
       rows.forEach((rowValues) => {
         const row = worksheet.addRow(rowValues);
         row.height = 65;
-        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        row.eachCell({ includeEmpty: true }, (cell) => {
           cell.font = { name: "Times New Roman", bold: true, size: 12 };
           cell.border = { top: border, right: border, bottom: border, left: border };
           cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-
-          if (colNumber === 2) {
-            const amoKey = String(rowValues[1] || "Unassigned AMO")
-              .trim()
-              .toLocaleLowerCase();
-            const fgColor = amoFillByName.get(amoKey) || "FFF2F3F5";
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fgColor } };
-          }
         });
       });
 
