@@ -85,11 +85,9 @@ const Progress = () => {
   }, [refreshVersion]);
 
   const handleEditAmo = (group) => {
-    const matchingReport = reports.find((r) => (r.amo || "").trim() === group.amo);
     setEditingAmo(group.amo);
     amoForm.setFieldsValue({
       amo: group.amo,
-      tcp: matchingReport?.tcp || "",
     });
     setIsAmoModalOpen(true);
   };
@@ -105,7 +103,6 @@ const Progress = () => {
       const values = await amoForm.validateFields();
       const oldAmo = editingAmo;
       const newAmo = values.amo.trim();
-      const newTcp = values.tcp !== undefined ? values.tcp.trim() : undefined;
 
       setIsSavingAmo(true);
       await apiRequest("/reports/amo/update", {
@@ -113,7 +110,6 @@ const Progress = () => {
         body: {
           oldAmo,
           newAmo,
-          tcp: newTcp,
         },
       });
 
@@ -123,7 +119,6 @@ const Progress = () => {
             return {
               ...item,
               amo: newAmo,
-              ...(newTcp !== undefined ? { tcp: newTcp } : {}),
             };
           }
           return item;
@@ -460,9 +455,6 @@ const Progress = () => {
             rules={[{ required: true, message: "Please enter AMO name & contact" }]}
           >
             <Input placeholder="e.g. Haq Nawaz 0345-7538817" />
-          </Form.Item>
-          <Form.Item name="tcp" label="TCP">
-            <Input placeholder="e.g. TCP-SATGARAH" />
           </Form.Item>
         </Form>
       </Modal>

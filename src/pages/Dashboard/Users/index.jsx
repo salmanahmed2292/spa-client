@@ -29,7 +29,6 @@ const exportHeaders = [
   "AMO",
   "UC",
   "Supervisor Name & #",
-  "TCP",
   "Vehicle / Rickshaw No",
   "Trip 01",
   "Trip 02",
@@ -432,7 +431,6 @@ const Users = () => {
           record.amo || "",
           record.uc || "",
           record.supervisor || "",
-          record.tcp || "",
           record.vehicleNo || "",
           "",
           "",
@@ -444,14 +442,14 @@ const Users = () => {
           record.remarks || "",
         ];
       });
-      const columnWidths = [8, 28, 10, 30, 22, 22, 20, 20, 20, 20, 20, 14, 18, 30];
+      const columnWidths = [8, 28, 10, 30, 22, 20, 20, 20, 20, 20, 14, 18, 30];
 
       worksheet.columns = exportHeaders.map((header, index) => ({
         header,
         key: `column${index + 1}`,
         width: columnWidths[index],
       }));
-      worksheet.mergeCells("A1:N1");
+      worksheet.mergeCells("A1:M1");
       worksheet.getCell("A1").value = `Daily Trip Report of Loader Rickshaw | Date: ${todayDate}`;
       worksheet.getRow(1).eachCell({ includeEmpty: true }, (cell) => {
         cell.font = { name: "Times New Roman", bold: true, size: 20, color: { argb: "FF1F4E78" } };
@@ -519,7 +517,7 @@ const Users = () => {
         const scaledHeight = Math.round(height * scale);
 
         worksheet.addImage(imageId, {
-          tl: { col: tripIndex + 6 + 0.04, row: rowIndex + 2 + 0.05 },
+          tl: { col: tripIndex + 5 + 0.04, row: rowIndex + 2 + 0.05 },
           ext: { width: scaledWidth, height: scaledHeight },
           editAs: "oneCell",
         });
@@ -533,18 +531,18 @@ const Users = () => {
         cell.border = { top: border, right: border, bottom: border, left: border };
         cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       });
-      worksheet.mergeCells(`A${totalRow.number}:K${totalRow.number}`);
-      worksheet.mergeCells(`L${totalRow.number}:N${totalRow.number}`);
+      worksheet.mergeCells(`A${totalRow.number}:J${totalRow.number}`);
+      worksheet.mergeCells(`K${totalRow.number}:M${totalRow.number}`);
       const grandTotalLabel = worksheet.getCell(`A${totalRow.number}`);
       grandTotalLabel.value = "Grand Total";
       grandTotalLabel.font = { name: "Times New Roman", bold: true, size: 26 };
       grandTotalLabel.alignment = { horizontal: "center", vertical: "middle" };
       grandTotalLabel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFC0CB" } };
-      const grandTotalValue = worksheet.getCell(`L${totalRow.number}`);
+      const grandTotalValue = worksheet.getCell(`K${totalRow.number}`);
       grandTotalValue.font = { name: "Times New Roman", bold: true, size: 26 };
       grandTotalValue.alignment = { horizontal: "center", vertical: "middle" };
       grandTotalValue.value = rows.length
-        ? { formula: `SUM(L3:L${lastDataRow})`, result: rows.reduce((sum, row) => sum + Number(row[11] || 0), 0) }
+        ? { formula: `SUM(K3:K${lastDataRow})`, result: rows.reduce((sum, row) => sum + Number(row[10] || 0), 0) }
         : 0;
       grandTotalValue.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF87CEEB" } };
 
@@ -554,7 +552,7 @@ const Users = () => {
         fitToPage: true,
         fitToWidth: 1,
         fitToHeight: 0,
-        printArea: `A1:N${totalRow.number}`,
+        printArea: `A1:M${totalRow.number}`,
         printTitlesRow: "2:2",
       };
 
