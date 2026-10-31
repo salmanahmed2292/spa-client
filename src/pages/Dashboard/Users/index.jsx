@@ -452,8 +452,8 @@ const Users = () => {
       worksheet.mergeCells("A1:M1");
       worksheet.getCell("A1").value = `Daily Trip Report of Loader Rickshaw | Date: ${todayDate}`;
       worksheet.getRow(1).eachCell({ includeEmpty: true }, (cell) => {
-        cell.font = { name: "Times New Roman", bold: true, size: 20, color: { argb: "FF1F4E78" } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF87CEEB" } };
+        cell.font = { name: "Times New Roman", bold: true, size: 20, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F4E79" } };
         cell.border = { top: border, right: border, bottom: border, left: border };
         cell.alignment = { horizontal: "center", vertical: "middle" };
       });
